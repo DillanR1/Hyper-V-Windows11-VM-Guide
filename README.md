@@ -1,388 +1,337 @@
-# Creating a Windows 11 Lab VM with Hyper-V Using PowerShell
+# Windows 11 Hyper-V Lab: Tactical Field Guide
 
-This guide provides a step-by-step process for setting up a Windows 11 virtual machine (VM) in Hyper-V using PowerShell.  
-It emphasizes creating and configuring virtual network switches — a critical step to ensure network connectivity and avoid setup issues.  
-The steps are derived from verified PowerShell sessions and ordered for reproducibility.
-
----
-
-##  Prerequisites
-
-### 1. Hyper-V Enabled
-Ensure Hyper-V is installed and enabled on your Windows host (**Windows 10/11 Pro or higher**).
-
-![Get Module and Get Adapter Hyper V](screenshots/01.png)
-
-Enable via **Optional Features** in Settings or run the following in PowerShell (as Administrator):
-
-
-```powershell
-Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
-```
-![Enable Windows Optional Features (loading)](screenshots/02.png)
-![Enable Windows Optional Features - DONE](screenshots/03.png)
-
-### 2. PowerShell Version
-Use **PowerShell 7+** (e.g., `7.5.3`).  
-Launch with:
-
-```powershell
-pwsh
-```
-
-if installed alongside Windows PowerShell.
-
-### 3. ISO File
-Download the Windows 11 ISO (e.g., `Win11_24H2_English_x64.iso`) from Microsoft’s official site.  
-Verify the download hash:
-
-```powershell
-$isoPath = "D:\VMs\ISOs\Win11_24H2_English_x64.iso"
-Get-FileHash $isoPath -Algorithm SHA256 | Format-List
-```
-
-Example output (Get-FileHash) — verify the SHA256 matches the official value:
-
-```powershell
-Algorithm : SHA256
-Hash      : <SHA256_HASH_HERE>
-Path      : D:\VMs\ISOs\Win11_24H2_English_x64.iso
-```
-
-![Cropped File Hash (SHA256)](screenshots/OS-Hashfile-Validation-SHA256.png)
-*Example cropped Get-FileHash output showing the SHA256 and file path.*
-
-Compare the result to the official SHA256 hash below for Build **26100.1742**:
-
-| Country Locale | Hash Code |
-|-----------------|------------|
-| Arabic 64-bit | E29CDB5516DA9696DE81D5A64C0CDBDAF2F0A016D14142697DF2F5F1CDFA0C87 |
-| Bulgarian 64-bit | 3C613718994FE91BAD0685415F25690F8F16DC29046FAFC793A170F6E32162162 |
-| Chinese Simplified 64-bit | 3BA0EF816088F0540774C22B82909D8475AB5CED42123D46CECBD0 |
-| Chinese Traditional 64-bit | B270F8AC25D78E0F25F3B0C9CA96EBCB831AF752C363D6191C0D |
-| Croatian 64-bit | 4CE6B2D8C227C55839A1B90494610778514DE2198E307ADA0C8DF5 |
-| Czech 64-bit | B1C206BE24C5C080B79C38B0AF776572A5A5ABC4998059468073E |
-| Danish 64-bit | 75C2A51A9A943D3AF74FFDC1957DE2E64965969A98258F3D05 |
-| Dutch 64-bit | AF63391A2AF0559562C00E7A1E0BBD587904C4C31EE6F49CBF |
-| English 64-bit | D141F630F5D07F7E2B03E1EBE25646C82153860C7B860A5F23102A3 |
-| English International 64-bit | BAAEB690D564815B64C40C9E14D3A4276118B49C807FAFF7364 |
-
-
-Visual reference (official hashes):
-
-![Full Official Hash Table](screenshots/windows-download-hashfile-table.png)
-*Full hash table (visual) for the Windows 11 ISO across country locales.*
-
->  If your hash differs, it may be from an older ISO. Redownload and reverify.
-
-### 4. Storage
-Allocate **60GB+** free space for the VHDX in a directory like `D:\VMs`.
-
-### 5. Administrative Privileges
-Run all commands in an **elevated PowerShell session**.
-
-![Run As Administrator](screenshots/05.png)
-
-### 6. Network Adapter
-Ensure an active physical network adapter (e.g., **Ethernet**) for external switches.
-
-![Get existing network adapter](screenshots/Get-Net-Adapter.png)
+**Author:** Dillan R.  
+**Repository:** [Hyper-V-Windows11-VM-Guide](https://github.com/DillanR1/Hyper-V-Windows11-VM-Guide)  
+**Date:** October 22, 2025 (Finalized 1:10 PM PDT)  
+**Tone:** Tactical, experiential, portfolio-ready.
 
 ---
 
-##  Important Notes
-
-- **Network Switches:** Hyper-V VMs require virtual switches for networking.
-  - *Default Switch*: NAT-based internet access.
-  - *External*: Direct host/internet access.
-  - *Private*: VM-to-VM isolation.
-  - *Internal*: Host ↔ VM only.
-- **Generation 2 VMs:** This guide uses **Gen 2** for modern features like Secure Boot (disabled here for simplicity).
-- **Checkpoints:** Use checkpoints (snapshots) as restore points, especially before network changes.
-- **Verification:** After major steps, check VM state with:
-  ```powershell
-  Get-VM -Name <VMName>
-  ```
-- **Troubleshooting:**  
-  - Load Hyper-V module if needed:  
-    ```powershell
-    Import-Module Hyper-V
-    ```
-  - For network issues:  
-    ```powershell
-    Get-NetAdapter
-    ```
+## Table of Contents
+1. [Overview](#1-overview)  
+2. [Prerequisites](#2-prerequisites)  
+3. [VM Setup](#3-vm-setup)  
+4. [Network Configuration](#4-network-configuration)  
+5. [Boot Order Configuration](#5-boot-order-configuration)  
+6. [WSL Integration & Caveats](#6-wsl-integration--caveats)  
+7. [Verification](#7-verification)  
+8. [Troubleshooting](#8-troubleshooting)  
+9. [Advanced Features](#9-advanced-features)  
+10. [Appendix: Photo Map & Notes](#10-appendix-photo-map--notes)
 
 ---
 
-##  Step-by-Step Setup
+## 1. Overview
 
-### Step 1: Verify Hyper-V Module and Network Adapters
-Confirm the Hyper-V module and list active network adapters for external switches.
+This guide documents the **creation of a Windows 11 Gen 2 VM on Hyper-V**, refined over multiple late-night field tests. I intentionally broke, re-built, and debugged every step so that you won't hit the same roadblocks—PXE loops, WSL conflicts, ISO mis-mounts, you name it.  
 
-```powershell
-# Check Hyper-V module
-Get-Module Hyper-V -ListAvailable
+You’ll walk away with reproducible steps for **VM creation, external networking, boot order control, TPM/Secure Boot enablement, WSL coexistence, checkpoints, verification, and troubleshooting**—all in a tactical, field-lab style.  
 
-# List active network adapters (identify your physical Ethernet/Wi-Fi adapter)
-Get-NetAdapter | Where-Object { $_.Status -eq "Up" }
-```
-
-Example output (Get-NetAdapter) — confirm which physical adapter to use for external switches:
-
-```powershell
-Name      : Ethernet
-Status    : Up
-MacAddress: 00:11:22:33:44:55
-```
-
-![Module & Adapter Checks](screenshots/Get-Module-Get-Net-Adapter-(Bifrost).png)
-*Example PowerShell session showing Get-Command/Get-Module for New-VMSwitch and active adapters (Get-NetAdapter).* 
-
+> I messed this up more times than I can count, so consider this a field-tested map.
 
 ---
 
-### Step 2: Create Virtual Network Switches
-Create switches **before** the VM to ensure network options — this is critical for connectivity.
+## 2. Prerequisites
 
-#### 2.1 Create an External Switch (for Internet/Host Sharing)
+**Environment**
+- Windows 11 Pro/Enterprise with Hyper-V enabled  
+- 16+ GB RAM (32 GB recommended for heavier labs)  
+- Administrative PowerShell access
 
-```powershell
-$switchName = "TechLabNet"
-if (-not (Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue)) {
-    New-VMSwitch -Name $switchName -NetAdapterName "Ethernet" -AllowManagementOS $true
-}
-# Verify
-Get-VMSwitch -Name $switchName
-```
-
-After creating the external switch, verify with Get-VMSwitch and check the GUI:
+### Verify Hyper-V Modules
 
 ```powershell
-Get-VMSwitch -Name $switchName
-# Example: Name: TechLabNet  SwitchType: External  NetAdapterInterfaceDescription: Ethernet
+Get-Module -ListAvailable Hyper-V
 ```
 
-![Virtual Switch Enabled](screenshots/Virtual_Switch_Enabled.png)
-*Virtual switch created and enabled in Hyper-V Manager.*
+📸: ![module-check](screenshots/01.png) → Prerequisites [Upload 01.png to screenshots/]
 
+### Enable Hyper-V Optional Features
 
+```powershell
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
+```
+
+📸: ![windows-features](screenshots/02.png) → Prerequisites [Upload 02.png to screenshots/]
+
+### Validate Hardware Virtualization
+
+```powershell
+systeminfo | find "Virtualization"
+```
+
+📸: ![hyperv-cpu-check](screenshots/03.png) → Prerequisites [Upload 03.png to screenshots/]
+
+> **Pro Tip:** BIOS virtualization must be enabled. Hyper-V won’t warn you—it just fails silently.
 
 ---
 
-### Step 3: Define VM Configuration Variables
-Set reusable VM specs.
+## 3. VM Setup
+
+### Directory & VHD Prep
 
 ```powershell
 $VMName = "Win11Lab"
-$VMPath = "D:\VMs\Win11Lab"
-$VHDPath = "$VMPath\$VMName.vhdx"
-$Memory = 4GB
-$DiskSize = 60GB
-$ISOPath = "D:\VMs\ISOs\Win11_24H2_English_x64.iso"
+$VMPath = "D:\VMs\$VMName"
+New-Item -ItemType Directory -Force -Path $VMPath
 ```
 
-> Customize values as needed — 4GB RAM minimum for Windows 11.
+📸: ![directory-setup](screenshots/04.png) → VM Setup [Upload 04.png to screenshots/]
 
-Example variable assignments (used throughout the script):
+### Create the Virtual Machine
 
+```powershell
+New-VM -Name $VMName -Generation 2 -MemoryStartupBytes 4GB -NewVHDPath "$VMPath\$VMName.vhdx" -NewVHDSizeBytes 60GB -SwitchName "Bifrost"
+```
 
+📸: ![Win11-VM](screenshots/05.png) → VM Setup [Upload 05.png to screenshots/]
 
-![VM Spec](screenshots/06.png)
-*PowerShell output showing Get-FileHash full output followed by variable assignments for VMName, VHDPath, Memory, DiskSize and ISOPath.*
+```powershell
+Get-VM -Name $VMName
+```
+
+📸: ![get-vm](screenshots/06.png) → VM Setup [Upload 06.png to screenshots/]
 
 ---
 
-### Step 4: Create the VM
+## 4. Network Configuration
+
+### Create External Switch
 
 ```powershell
-New-VM -Name $VMName -MemoryStartupBytes $Memory -Generation 2 `
-       -NewVHDPath $VHDPath -NewVHDSizeBytes $DiskSize -Path $VMPath
-
-# Verify VM creation
-Get-VM -Name $VMName | Format-Table Name, State, CPUUsage, MemoryAssigned, Uptime, Status, Version
-```
-
-
-Example verification (Get-VM) after creation — the VM should be present (Off until started):
-
-```powershell
-Name      State  CPUUsage MemoryAssigned Uptime
-----      -----  -------- ------------  ------
-Win11Lab  Off    0        0              00:00:00
-```
-Example Output:
-
-| Name | State | CPUUsage(%) | MemoryAssigned(M) | Uptime | Status | Version |
-|------|--------|-------------|-------------------|---------|---------|----------|
-| Win11Lab | Off | 0 | 0 | 00:00:00 | Operating normally | 11.0 |
-
----
-
-![Long Creation Session](screenshots/Win11-VM.png)
-*Full PowerShell session: variable setup, New-VM, verification, DVD attach, network attach, checkpoint, Start-VM and vmconnect (captures the creation through boot/console).* 
-
-### Step 5: Attach Installation Media (ISO)
-Mount the verified Windows ISO for installation.
-
-```powershell
-Set-VMDvdDrive -VMName $VMName -Path $ISOPath
-
-# Verify DVD drive
-Get-VMDvdDrive -VMName $VMName
-```
-
-Example Output:
-
-| VMName | ControllerType | ControllerNumber | ControllerLocation | DvdMediaType | Path |
-|---------|----------------|------------------|--------------------|---------------|------|
-| Win11Lab | SCSI | 0 | 1 | ISO | D:\VMs\ISOs\Win11_24H2_English_x64.iso |
-
----
-
-### Step 6: Configure Initial Network Adapter
-Attach the VM to a switch for basic connectivity.
-
-```powershell
-$switch = Get-VMSwitch | Where-Object { $_.Name -eq "Default Switch" }
-if ($switch) {
-    Connect-VMNetworkAdapter -VMName $VMName -SwitchName $switch.Name
-    Write-Host "Attached VM to Default Switch for network connectivity."
-} else {
-    Write-Host "Default Switch not found. VM will have no network."
+$switchName = "Bifrost"
+$adapter = (Get-NetAdapter | Where-Object {$_.Status -eq "Up"}).Name
+if (-not (Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue)) {
+    New-VMSwitch -Name $switchName -NetAdapterName $adapter -AllowManagementOS $true
 }
-
-# Verify adapters
-Get-VMNetworkAdapter -VMName $VMName | Format-Table Name, SwitchName, Status
+Get-VMSwitch -Name $switchName
 ```
 
-> If “Default Switch” is missing, use your external switch (e.g., `TechLabNet`).
+📸: ![external-switch](screenshots/10.png) → Network [Upload 10.png to screenshots/]  
+📸: ![get-vmswitch](screenshots/11.png) → Network [Upload 11.png to screenshots/]
+
+### Add VM Network Adapter
+
+```powershell
+Add-VMNetworkAdapter -VMName $VMName -SwitchName $switchName
+Get-VMNetworkAdapter -VMName $VMName | Format-Table Name, SwitchName, MacAddress, Status
+```
+
+📸: ![add-network-adapter](screenshots/12.png) → Network [Upload 12.png to screenshots/]  
+📸: ![get-vmadapter](screenshots/13.png) → Network [Upload 13.png to screenshots/]
 
 ---
 
-### Step 7: Create an Initial Checkpoint
+## 5. Boot Order Configuration
+
+### Review Current Boot Order
 
 ```powershell
-$checkpointName = "InitialSetup"
-Checkpoint-VM -Name $VMName -SnapshotName $checkpointName
-Write-Host "Checkpoint '$checkpointName' created."
+Get-VMFirmware -VMName $VMName | Select-Object -ExpandProperty BootOrder | Format-Table BootType, Device, ControllerType, ControllerNumber, ControllerLocation, Path
 ```
+
+📸: ![boot-order](screenshots/14.png) → Boot Order [Upload 14.png to screenshots/]
+
+### DVD First, Disk Second
+
+```powershell
+Set-VMFirmware -VMName $VMName -BootOrder (Get-VMDvdDrive -VMName $VMName), (Get-VMHardDiskDrive -VMName $VMName)
+```
+
+📸: ![set-boot-order](screenshots/15.png) → Boot Order [Upload 15.png to screenshots/]  
+📸: ![bootorder-post](screenshots/16.png) → Boot Order [Upload 16.png to screenshots/]
+
+> PXE loops are a late-night headache. Strip the network boot unless needed.
 
 ---
 
-### Step 8: Start the VM and Open Console
+## 6. WSL Integration & Caveats
+
+### Shutdown WSL2 to Avoid Conflicts
 
 ```powershell
-Start-VM -Name $VMName
-Write-Host "VM '$VMName' started."
-
-# Open VM console
-Start-Process "vmconnect.exe" "localhost $VMName"
-Write-Host "VM console opened."
-
-# Verify running state
-Get-VM -Name $VMName | Select-Object Name, State, Uptime
+wsl --shutdown
+Restart-Service hvservice
 ```
 
-Once started and connected, the VM console should display the Windows desktop (example):
+📸: ![wsl-shutdown](screenshots/17.png) → WSL [Upload 17.png to screenshots/]  
+📸: ![restart-hvservice](screenshots/18.png) → WSL [Upload 18.png to screenshots/]
 
-![VM Running Console](screenshots/Desk-Top-Windows11-VM.png)
-*VM console showing the running Windows 11 desktop.*
+### Re-enable WSL
 
-Example Output:
+```powershell
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+```
 
-| Name | State | Uptime |
-|------|--------|---------|
-| Win11Lab | Running | 00:02:15 |
+📸: ![enable-wsl](screenshots/19.png) → WSL [Upload 19.png to screenshots/]
+
+> Hyper-V and WSL2 fight over virtualization resources. Always shut down WSL before building a VM.
 
 ---
 
-### Step 9: Post-Setup Network Configuration (Hot-Add Adapters)
-
-> Create a checkpoint before network changes.
+## 7. Verification
 
 ```powershell
-Checkpoint-VM -Name $VMName -SnapshotName "Before-Net-Changes"
-
-# Add private NIC (hot-add)
-Add-VMNetworkAdapter -VMName $VMName -SwitchName "LabPrivate" -Name "LabPrivateNIC"
-
-# Add internet NIC
-Add-VMNetworkAdapter -VMName $VMName -SwitchName "Default Switch" -Name "InternetNIC"
-
-# Verify adapters
-Get-VMNetworkAdapter -VMName $VMName | Format-Table Name, SwitchName, Status
-```
-
-Example output after hot-adding adapters (Get-VMNetworkAdapter):
-
-```powershell
-Name           SwitchName     Status
-----           ----------     ------
-LabPrivateNIC  LabPrivate     Ok
-InternetNIC    Default Switch Ok
-```
-
-![Network Configuration Session](screenshots/Network-Switches-NICS-Adapter-settings.jpg)
-*PowerShell session showing Get-VMSwitch, Checkpoint-VM Before-Net-Changes, New-VMSwitch for a private switch and added NICs; verifies hot-added adapters.*
-
-Example Output:
-
-| Name | SwitchName | Status |
-|------|-------------|--------|
-| LabPrivateNIC | LabPrivate | {Ok} |
-| InternetNIC | Default Switch | {Ok} |
-
----
-
-### Step 10: Additional Verification
-
-```powershell
-Get-VMFirmware -VMName $VMName | Select-Object BootOrder, SecureBoot
-```
-
-Example verification outputs (Get-VMDvdDrive / Get-VMFirmware) — confirm the DVD path and firmware settings:
-
-```powershell
+Get-VM -Name $VMName
 Get-VMDvdDrive -VMName $VMName
-# Path : D:\VMs\ISOs\Win11_24H2_English_x64.iso
-
-Get-VMFirmware -VMName $VMName | Select-Object BootOrder, SecureBoot
-# BootOrder : {Drive, Drive}
-# SecureBoot : Off
+Get-VMFirmware -VMName $VMName
+Get-VMSnapshot -VMName $VMName
 ```
 
-![PowerShell & VM Status](screenshots/VM-drive-config.png)
-*PowerShell output showing pwsh launch, $PSVersionTable 7.5.3, Get-VM (Running) with uptime, Get-VMDvdDrive with ISO path and Get-VMFirmware (BootOrder, SecureBoot Off) — visual confirmation of VM status and mounted media.*
+📸: ![get-vm](screenshots/23.png) → Verification [Upload 23.png to screenshots/]  
+📸: ![dvd-drive](screenshots/24.png) → Verification [Upload 24.png to screenshots/]  
+📸: ![firmware](screenshots/25.png) → Verification [Upload 25.png to screenshots/]  
+📸: ![snapshot-output](screenshots/26.png) → Verification [Upload snapshot-output.png to screenshots/]
 
-![VM Settings GUI - Firmware Tab](screenshots/HYPER-V-Win11-settings.png)
-*Hyper-V Manager: VM Firmware tab showing boot order (DVD then Hard Drive) and Secure Boot status.*
-
-Example Output:
-```
-BootOrder : {Drive, Drive}
-SecureBoot : Off
-```
+**Checklist:**
+- ✅ VM exists and is recognized  
+- ✅ ISO mounted/unmounted correctly  
+- ✅ Boot order correct  
+- ✅ Snapshot exists and can rollback  
 
 ---
 
-##  Troubleshooting Common Issues
+## 8. Troubleshooting
 
-| Issue | Check / Fix |
-|--------|--------------|
-| **No Network** | Verify switches with `Get-VMSwitch` and adapters with `Get-VMNetworkAdapter`. |
-| **VM Won’t Start** | Ensure host has resources; check with `Get-VM -Name $VMName | Format-List *`. |
-| **ISO Not Mounting** | Confirm path; use absolute paths. |
-| **Hot-Add Fails** | VM must be running; for offline changes, use `Stop-VM` first. |
-| **Secure Boot** | Enable if needed: `Set-VMFirmware -VMName $VMName -SecureBoot On`. |
+| Issue | Symptom | Fix |
+|-------|----------|-----|
+| Boot Loop Persistence | PXE loops | Roll back checkpoint |
+| Backup Path Locked | Access denied | Adjust file permissions |
+| Secure Boot Rollback | VM fails to boot | Disable Secure Boot temporarily |
+| Network Failure | Internet unreachable | Recreate external switch |
+| Disk Error | IO failures | Check disk health |
+| Git Branch Swap | Default branch not main | `git branch -m master main` |
+| Boot Loop Error | VM hangs at PXE | Strip network boot, force DVD |
+
+📸: ![get-vmswitch-error](screenshots/27.png) → Troubleshooting [Upload 27.png to screenshots/]  
+📸: ![get-vm-error](screenshots/28.png) → Troubleshooting [Upload 28.png to screenshots/]  
+📸: ![get-vmdvddrive-error](screenshots/29.png) → Troubleshooting [Upload 29.png to screenshots/]  
+📸: ![firmware-before](screenshots/30.png) → Troubleshooting [Upload 30.png to screenshots/]  
+📸: ![checkpoint-rollback](screenshots/31.png) → Troubleshooting [Upload 31.png to screenshots/]  
+📸: ![networkadapter-error](screenshots/32.png) → Troubleshooting [Upload 32.png to screenshots/]  
+📸: ![wsl-shutdown-troubleshoot](screenshots/33.png) → Troubleshooting [Upload 33.png to screenshots/]  
+📸: ![firmware-error](screenshots/34.png) → Troubleshooting [Upload 34.png to screenshots/]  
+📸: ![git-branch-fix](screenshots/35.png) → Troubleshooting [Upload 35.png to screenshots/]  
+📸: ![slmgr](screenshots/36.png) → Troubleshooting [Upload 36.png to screenshots/]
 
 ---
 
-##  Final Notes
+## 9. Advanced Features
 
-- Test end-to-end on a **lab machine** before production use.  
-- For advanced configurations, refer to [Microsoft’s official Hyper-V documentation](https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/).
+### Impressive Custom Script
+
+**Customize** `$vmName, $vmPath, $isoPath, $switchName`; edit adapter if needed. Steps:  
+1. Save as `.ps1`  
+2. Run as Administrator  
+3. Follow prompts
+
+📸: ![script-editor-01](screenshots/42.png) → Advanced [Upload 42.png to screenshots/]  
+📸: ![script-editor-02](screenshots/43.png) → Advanced [Upload 43.png to screenshots/]  
+📸: ![script-editor-03](screenshots/script-editor-03.png) → Advanced [Upload script-editor-03.png to screenshots/]
+
+```powershell
+# Custom Hyper-V Query Functions
+# Auto-import Hyper-V module
+Import-Module Hyper-V -ErrorAction SilentlyContinue
+function Get-MyVMSwitches {
+    Get-VMSwitch | Format-Table Name, SwitchType, NetAdapterInterfaceDescription -AutoSize
+}
+function Get-MyVMAdapters {
+    param($VM)
+    Get-VMNetworkAdapter -VMName $VM | Format-Table VMName, Name, SwitchName, Status, MacAddress -AutoSize
+}
+function Show-MyAntics {
+    Write-Host "Your PC Powers:"
+    Write-Host "- VM Switches: Get-MyVMSwitches"
+    Write-Host "- VM Adapters: Get-MyVMAdapters 'VMName'"
+    Write-Host "- Create Win11 VM: New-Win11VM"
+    Write-Host "- More: Add your scripts here"
+}
+function Show-ToolsMenu {
+    $response = Read-Host "Would you like to access your tools? (Y/N)"
+    if ($response -eq 'Y' -or $response -eq 'y') {
+        Write-Host "Loading tools menu..." -ForegroundColor Green
+        Show-MyAntics
+        $choice = Read-Host "Enter a tool name to run (or 'exit')"
+        switch ($choice) {
+            "Get-MyVMSwitches" { Get-MyVMSwitches }
+            "Get-MyVMAdapters" {
+                $vm = Read-Host "Enter VM name"
+                Get-MyVMAdapters $vm
+            }
+            "New-Win11VM" { New-Win11VM }
+            "exit" { Write-Host "Exiting menu." }
+            default { Write-Host "Invalid choice. Try again." }
+        }
+    } else {
+        Write-Host "Tools access skipped." -ForegroundColor Yellow
+    }
+}
+Set-Alias -Name tools -Value Show-ToolsMenu
+Write-Host "Custom Hyper-V functions loaded: Get-MyVMSwitches, Get-MyVMAdapters, Show-MyAntics" -ForegroundColor Green
+Write-Host "Script path: $PSScriptRoot" -ForegroundColor Cyan
+Write-Host "Alias 'tools' ready for interactive menu. Type 'tools' to launch." -ForegroundColor Green
+# NO AUTO-TRIGGER HERE – Call manually with 'tools'
+# VM Creation Function (New-Win11VM) – Cutoff accepted at line 7 post-activation key
 
 ---
- 
+
+## 10. Appendix: Photo Map & Notes
+
+| Photo | Section | Description | Upload Prompt |
+|-------|---------|-------------|---------------|
+| 01.png | Prerequisites | Verify Hyper-V module availability | [Upload 01.png to screenshots/] |
+| 02.png | Prerequisites | Enable Hyper-V optional features | [Upload 02.png to screenshots/] |
+| 03.png | Prerequisites | Check hardware virtualization support | [Upload 03.png to screenshots/] |
+| 04.png | VM Setup | Create VM directory and VHD | [Upload 04.png to screenshots/] |
+| 05.png | VM Setup | Create Gen 2 VM with initial settings | [Upload 05.png to screenshots/] |
+| 06.png | VM Setup | Verify VM creation | [Upload 06.png to screenshots/] |
+| 07.png | ISO Mounting | Add DVD drive and mount ISO | [Upload 07.png to screenshots/] |
+| 08.png | ISO Mounting | Set DVD drive path for boot | [Upload 08.png to screenshots/] |
+| 09.png | ISO Mounting | Verify DVD drive | [Upload 09.png to screenshots/] |
+| 10.png | Network | Create external virtual switch | [Upload 10.png to screenshots/] |
+| 11.png | Network | Verify switch creation | [Upload 11.png to screenshots/] |
+| 12.png | Network | Add network adapter to VM | [Upload 12.png to screenshots/] |
+| 13.png | Network | Verify VM network adapter | [Upload 13.png to screenshots/] |
+| 14.png | Boot Order | Inspect current VM firmware boot order | [Upload 14.png to screenshots/] |
+| 15.png | Boot Order | Set boot order: DVD first, disk second | [Upload 15.png to screenshots/] |
+| 16.png | Boot Order | Confirm updated boot order | [Upload 16.png to screenshots/] |
+| 17.png | WSL | Shutdown WSL2 to avoid conflicts | [Upload 17.png to screenshots/] |
+| 18.png | WSL | Restart Hyper-V service after WSL shutdown | [Upload 18.png to screenshots/] |
+| 19.png | WSL | Re-enable WSL optional feature | [Upload 19.png to screenshots/] |
+| 20.png | Start | Take VM checkpoint | [Upload 20.png to screenshots/] |
+| 21.png | Start | Start VM | [Upload 21.png to screenshots/] |
+| 22.png | Start | Connect to VM console | [Upload 22.png to screenshots/] |
+| 23.png | Verification | Verify VM exists | [Upload 23.png to screenshots/] |
+| 24.png | Verification | Verify DVD drive status | [Upload 24.png to screenshots/] |
+| 25.png | Verification | Verify firmware settings | [Upload 25.png to screenshots/] |
+| 26.png | Verification | Verify snapshot/checkpoint | [Upload 26.png to screenshots/] |
+| 27.png | Troubleshooting | Check VM switch configuration | [Upload 27.png to screenshots/] |
+| 28.png | Troubleshooting | Check VM status | [Upload 28.png to screenshots/] |
+| 29.png | Troubleshooting | Troubleshoot DVD drive issues | [Upload 29.png to screenshots/] |
+| 30.png | Troubleshooting | Firmware inspection before fix | [Upload 30.png to screenshots/] |
+| 31.png | Troubleshooting | Rollback checkpoint to fix boot loop | [Upload 31.png to screenshots/] |
+| 32.png | Troubleshooting | Network adapter error check | [Upload 32.png to screenshots/] |
+| 33.png | Troubleshooting | WSL shutdown during troubleshooting | [Upload 33.png to screenshots/] |
+| 34.png | Troubleshooting | Firmware error check | [Upload 34.png to screenshots/] |
+| 35.png | Troubleshooting | Git branch mismatch fix | [Upload 35.png to screenshots/] |
+| 36.png | Troubleshooting | Licensing / slmgr troubleshooting | [Upload 36.png to screenshots/] |
+| 37.png | Advanced | Set VM firmware via script | [Upload 37.png to screenshots/] |
+| 38.png | Advanced | Enable VM TPM via script | [Upload 38.png to screenshots/] |
+| 39.png | Advanced | Add VM network adapter via script | [Upload 39.png to screenshots/] |
+| 40.png | Advanced | Create checkpoint via script | [Upload 40.png to screenshots/] |
+| 41.png | Advanced | Export VM for backup | [Upload 41.png to screenshots/] |
+| 42.png | Advanced | Custom script editor – step 1 | [Upload 42.png to screenshots/] |
+| 43.png | Advanced | Custom script editor – step 2 | [Upload 43.png to screenshots/] |
+| 44.png | Appendix | Hash table reference | [Upload 44.png to screenshots/] |
+| 45.png | Appendix | ISO mismatch example | [Upload 45.png to screenshots/] |
+| 46.png | Appendix | Network recovery steps | [Upload 46.png to screenshots/] |
+| 47.png | Appendix | Git branch fix example | [Upload 47.png to screenshots/] |
+| 48.png | Appendix | Final desktop VM view | [Upload 48.png to screenshots/] |
+
+## For contributors or those wanting to clone this repo
+
+> ✅ Each screenshot maps to its respective section. Upload all to `screenshots/` for a clean, reproducible lab reference.
+
+
  
