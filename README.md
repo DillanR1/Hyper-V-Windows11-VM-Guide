@@ -11,12 +11,16 @@ The steps are derived from verified PowerShell sessions and ordered for reproduc
 ### 1. Hyper-V Enabled
 Ensure Hyper-V is installed and enabled on your Windows host (**Windows 10/11 Pro or higher**).
 
+![Get Module and Get Adapter Hyper V](screenshots/01.png)
+
 Enable via **Optional Features** in Settings or run the following in PowerShell (as Administrator):
+
 
 ```powershell
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
 ```
-
+![Enable Windows Optional Features (loading)](screenshots/02.png)
+![Enable Windows Optional Features - DONE](screenshots/03.png)
 
 ### 2. PowerShell Version
 Use **PowerShell 7+** (e.g., `7.5.3`).  
@@ -45,7 +49,7 @@ Hash      : <SHA256_HASH_HERE>
 Path      : D:\VMs\ISOs\Win11_24H2_English_x64.iso
 ```
 
-![Cropped File Hash (SHA256)](screenshots/hashfile-validation.png)
+![Cropped File Hash (SHA256)](screenshots/OS-Hashfile-Validation-SHA256.png)
 *Example cropped Get-FileHash output showing the SHA256 and file path.*
 
 Compare the result to the official SHA256 hash below for Build **26100.1742**:
@@ -77,8 +81,12 @@ Allocate **60GB+** free space for the VHDX in a directory like `D:\VMs`.
 ### 5. Administrative Privileges
 Run all commands in an **elevated PowerShell session**.
 
+![Run As Administrator](screenshots/05.png)
+
 ### 6. Network Adapter
 Ensure an active physical network adapter (e.g., **Ethernet**) for external switches.
+
+![Get existing network adapter](screenshots/Get-Net-Adapter.png)
 
 ---
 
@@ -128,7 +136,7 @@ Status    : Up
 MacAddress: 00:11:22:33:44:55
 ```
 
-![Module & Adapter Checks](screenshots/Get-NetAdapter-Get-Module.png)
+![Module & Adapter Checks](screenshots/Get-Module-Get-Net-Adapter-(Bifrost).png)
 *Example PowerShell session showing Get-Command/Get-Module for New-VMSwitch and active adapters (Get-NetAdapter).* 
 
 
@@ -180,7 +188,7 @@ Example variable assignments (used throughout the script):
 
 
 
-![VM Spec & Hash Verification Session](screenshots/Win11-Validated-Variables.jpg)
+![VM Spec](screenshots/06.png)
 *PowerShell output showing Get-FileHash full output followed by variable assignments for VMName, VHDPath, Memory, DiskSize and ISOPath.*
 
 ---
