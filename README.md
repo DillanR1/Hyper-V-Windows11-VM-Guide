@@ -241,16 +241,22 @@ All we have to do now is call the function
 I have added this script to a larger - more impressive utility script that fires when the powershell terminal is first opened. The benefit here is that when I am spinning up VM's in the windows OS -I have a constant reminder of where all of my tools and utilities are.
 
 ```powershell
+
+# requires -RunAsAdministrator
+# requires -PowerShell Version 7
 # Custom Hyper-V Query Functions
 # Auto-import Hyper-V module
 Import-Module Hyper-V -ErrorAction SilentlyContinue
+
 function Get-MyVMSwitches {
     Get-VMSwitch | Format-Table Name, SwitchType, NetAdapterInterfaceDescription -AutoSize
 }
+
 function Get-MyVMAdapters {
     param($VM)
     Get-VMNetworkAdapter -VMName $VM | Format-Table VMName, Name, SwitchName, Status, MacAddress -AutoSize
 }
+
 function Show-MyAntics {
     Write-Host "Your PC Powers:"
     Write-Host "- VM Switches: Get-MyVMSwitches"
@@ -258,6 +264,7 @@ function Show-MyAntics {
     Write-Host "- Create Win11 VM: New-Win11VM"
     Write-Host "- More: Add your scripts here"
 }
+
 function Show-ToolsMenu {
     $response = Read-Host "Would you like to access your tools? (Y/N)"
     if ($response -eq 'Y' -or $response -eq 'y') {
@@ -278,12 +285,115 @@ function Show-ToolsMenu {
         Write-Host "Tools access skipped." -ForegroundColor Yellow
     }
 }
+
+function New-Win11VM {
+    <#
+    .SYNOPSIS
+        Automated Windows 11 Gen 2 VM Creation and Setup for Hyper-V Lab/Portfolio.
+    .DESCRIPTION
+        Creates a fresh Win11 VM with TPM, Secure Boot, external network switch for internet, and checkpoints.
+        Handles cleanup, boot order, and common troubleshooting (e.g., PXE loops, sys req bypass).
+        Assumes ISO downloaded/verified (use Get-FileHash -Algorithm SHA256 for integrity).
+    .EXAMPLE
+        New-Win11VM
+    .NOTES
+        Author: [Your Name] – A+ Certified Portfolio Piece
+        Paths: Customize variables as needed.
+        Post-run: GUI install, then eject ISO, flip boot order, activate.
+    #>
+    # Variables – Customize here
+    $vmName = "Win11TestLab"
+    $vmPath = "D:\VMs\$vmName"
+    $vhdPath = "$vmPath\$vmName.vhdx"
+    $isoPath = "D:\VMs\ISOs\Win11_24H2_English_x64.iso"
+    $switchName = "Bifrost" # External switch for internet sharing
+    $memory = 4GB
+    $diskSize = 60GB
+    $processorCount = 2
+    $checkpointName = "Fresh-Create"
+
+    # Safety prompt before cleanup
+    $confirm = Read-Host "WARNING: This will stop and remove any existing VM named '$vmName' and delete its files. Proceed? (Y/N)"
+    if ($confirm -ne 'Y' -and $confirm -ne 'y') {
+        Write-Host "Operation aborted. No changes made." -ForegroundColor Red
+        return
+    }
+
+    # Check for WSL2 conflict (Hyper-V can't nest virt easily)
+    if ((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux).State -eq 'Enabled') {
+        Write-Warning "WSL2 detected – may conflict with Hyper-V. Disabling temporarily."
+        Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
+        Write-Host "Restart host if needed, then rerun function."
+    }
+
+    # Cleanup old VM/files
+    Write-Host "Scrapping old VM if exists..."
+    Stop-VM -Name $vmName -Force -ErrorAction SilentlyContinue
+    Remove-VM -Name $vmName -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $vhdPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $vmPath -Recurse -Force -ErrorAction SilentlyContinue
+
+    # Create directories
+    New-Item -ItemType Directory -Path $vmPath -Force | Out-Null
+
+    # Create external switch if not exists
+    $adapter = Get-NetAdapter | Where-Object { $_.Status -eq "Up" } | Select-Object -First 1
+    if (-not (Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue)) {
+        Write-Host "Creating external switch '$switchName' on $($adapter.Name)..."
+        New-VMSwitch -Name $switchName -NetAdapterName $adapter.Name -AllowManagementOS $true
+    }
+
+    # Create VM
+    Write-Host "Creating Gen 2 VM..."
+    New-VM -Name $vmName -Path $vmPath -NewVHDPath $vhdPath -NewVHDSizeBytes $diskSize -Generation 2 -MemoryStartupBytes $memory
+    Set-VM -Name $vmName -ProcessorCount $processorCount
+
+    # Enable TPM with key protector
+    Set-VMKeyProtector -VMName $vmName -NewLocalKeyProtector
+    Enable-VMTPM -VMName $vmName
+
+    # Secure Boot
+    Set-VMFirmware -VMName $vmName -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
+
+    # Attach network adapter
+    Add-VMNetworkAdapter -VMName $vmName -SwitchName $switchName
+
+    # Mount ISO to DVD drive
+    Add-VMDvdDrive -VMName $vmName -ControllerNumber 0 -ControllerLocation 1
+    Set-VMDvdDrive -VMName $vmName -ControllerNumber 0 -ControllerLocation 1 -Path $isoPath
+
+    # Set boot order: DVD first, strip PXE/network to avoid loops
+    $dvd = Get-VMDvdDrive -VMName $vmName
+    $disk = Get-VMHardDiskDrive -VMName $vmName
+    if ($dvd -and $disk) {
+        Set-VMFirmware -VMName $vmName -BootOrder $dvd, $disk # Only DVD and disk – no network/PXE
+        Write-Host "Boot order set: DVD first for install (PXE stripped)."
+    }
+
+    # Checkpoint fresh state
+    Checkpoint-VM -Name $vmName -SnapshotName $checkpointName
+    Write-Host "Checkpoint '$checkpointName' created."
+
+    # Output next steps
+    Write-Host "VM rebuilt successfully. Next:"
+    Write-Host "1. Start via Hyper-V Manager GUI (better timing for 'press key' prompt)."
+    Write-Host "2. Install: English US, skip product key, Custom install to VHDX."
+    Write-Host "3. If sys req error: Shift+F10 > cmd > reg add HKLM\SYSTEM\Setup\LabConfig /v BypassTPMCheck /t REG_DWORD /d 1 /f"
+    Write-Host " (Add /v BypassSecureBootCheck /d 1 /f and /v BypassRAMCheck /d 1 /f if needed)."
+    Write-Host "4. Post-install: Eject ISO (Set-VMDvdDrive -VMName $vmName -Path `$null)"
+    Write-Host "5. Flip boot: Set-VMFirmware -VMName $vmName -BootOrder $disk, $dvd"
+    Write-Host "6. Activate: VK7JG-NPHTM-C97JM-9MPGT-3V66T (generic Pro key)."
+    Write-Host "7. Verify network: ping google.com"
+    Write-Host "8. Checkpoint: Checkpoint-VM -Name $vmName -SnapshotName 'Post-Install-Online'"
+    Write-Host "Run Start-Process vmconnect.exe -ArgumentList 'localhost', $vmName to connect."
+}
+
 Set-Alias -Name tools -Value Show-ToolsMenu
+
+# Reminder on startup
 Write-Host "Custom Hyper-V functions loaded: Get-MyVMSwitches, Get-MyVMAdapters, Show-MyAntics" -ForegroundColor Green
 Write-Host "Script path: $PSScriptRoot" -ForegroundColor Cyan
 Write-Host "Alias 'tools' ready for interactive menu. Type 'tools' to launch." -ForegroundColor Green
-# NO AUTO-TRIGGER HERE – Call manually with 'tools'
-# VM Creation Function (New-Win11VM) – Cutoff accepted at line 7 post-activation key
 ```
 ---
 
