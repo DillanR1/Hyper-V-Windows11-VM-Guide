@@ -44,7 +44,7 @@ You’ll walk away with reproducible steps for **VM creation, external networkin
 Get-Module -ListAvailable Hyper-V
 ```
 
-📸: ![module-check](screenshots/01.png) → Prerequisites [Upload 01.png to screenshots/]
+ ![module-check](screenshots/01.png)
 
 ### Enable Hyper-V Optional Features
 
@@ -52,7 +52,7 @@ Get-Module -ListAvailable Hyper-V
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
 ```
 
-📸: ![windows-features](screenshots/02.png) → Prerequisites [Upload 02.png to screenshots/]
+ ![windows-features](screenshots/02.png) 
 
 ### Validate Hardware Virtualization
 
@@ -60,7 +60,7 @@ Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
 systeminfo | find "Virtualization"
 ```
 
-📸: ![hyperv-cpu-check](screenshots/03.png) → Prerequisites [Upload 03.png to screenshots/]
+ ![hyperv-cpu-check](screenshots/03.png) 
 
 > **Pro Tip:** BIOS virtualization must be enabled. Hyper-V won’t warn you—it just fails silently.
 
@@ -76,7 +76,7 @@ $VMPath = "D:\VMs\$VMName"
 New-Item -ItemType Directory -Force -Path $VMPath
 ```
 
-📸: ![directory-setup](screenshots/04.png) → VM Setup [Upload 04.png to screenshots/]
+ ![directory-setup](screenshots/06.png) 
 
 ### Create the Virtual Machine
 
@@ -84,13 +84,13 @@ New-Item -ItemType Directory -Force -Path $VMPath
 New-VM -Name $VMName -Generation 2 -MemoryStartupBytes 4GB -NewVHDPath "$VMPath\$VMName.vhdx" -NewVHDSizeBytes 60GB -SwitchName "Bifrost"
 ```
 
-📸: ![Win11-VM](screenshots/05.png) → VM Setup [Upload 05.png to screenshots/]
+ ![Win11-VM](screenshots/07.png) 
 
 ```powershell
 Get-VM -Name $VMName
 ```
 
-📸: ![get-vm](screenshots/06.png) → VM Setup [Upload 06.png to screenshots/]
+ ![get-vm](screenshots/08.png) 
 
 ---
 
@@ -107,8 +107,10 @@ if (-not (Get-VMSwitch -Name $switchName -ErrorAction SilentlyContinue)) {
 Get-VMSwitch -Name $switchName
 ```
 
-📸: ![external-switch](screenshots/10.png) → Network [Upload 10.png to screenshots/]  
-📸: ![get-vmswitch](screenshots/11.png) → Network [Upload 11.png to screenshots/]
+ ![external-switch](screenshots/24.png)
+ 
+
+#
 
 ### Add VM Network Adapter
 
@@ -117,9 +119,7 @@ Add-VMNetworkAdapter -VMName $VMName -SwitchName $switchName
 Get-VMNetworkAdapter -VMName $VMName | Format-Table Name, SwitchName, MacAddress, Status
 ```
 
-📸: ![add-network-adapter](screenshots/12.png) → Network [Upload 12.png to screenshots/]  
-📸: ![get-vmadapter](screenshots/13.png) → Network [Upload 13.png to screenshots/]
-
+ ![get-vmswitch](screenshots/25.png) 
 ---
 
 ## 5. Boot Order Configuration
@@ -130,7 +130,7 @@ Get-VMNetworkAdapter -VMName $VMName | Format-Table Name, SwitchName, MacAddress
 Get-VMFirmware -VMName $VMName | Select-Object -ExpandProperty BootOrder | Format-Table BootType, Device, ControllerType, ControllerNumber, ControllerLocation, Path
 ```
 
-📸: ![boot-order](screenshots/14.png) → Boot Order [Upload 14.png to screenshots/]
+ ![boot-order](screenshots/30.png)
 
 ### DVD First, Disk Second
 
@@ -138,8 +138,8 @@ Get-VMFirmware -VMName $VMName | Select-Object -ExpandProperty BootOrder | Forma
 Set-VMFirmware -VMName $VMName -BootOrder (Get-VMDvdDrive -VMName $VMName), (Get-VMHardDiskDrive -VMName $VMName)
 ```
 
-📸: ![set-boot-order](screenshots/15.png) → Boot Order [Upload 15.png to screenshots/]  
-📸: ![bootorder-post](screenshots/16.png) → Boot Order [Upload 16.png to screenshots/]
+ ![set-boot-order](screenshots/37.png) 
+ ![bootorder-post](screenshots/38.png)
 
 > PXE loops are a late-night headache. Strip the network boot unless needed.
 
@@ -154,8 +154,8 @@ wsl --shutdown
 Restart-Service hvservice
 ```
 
-📸: ![wsl-shutdown](screenshots/17.png) → WSL [Upload 17.png to screenshots/]  
-📸: ![restart-hvservice](screenshots/18.png) → WSL [Upload 18.png to screenshots/]
+ ![wsl-shutdown](screenshots/17.png)  
+ ![restart-hvservice](screenshots/18.png)
 
 ### Re-enable WSL
 
@@ -163,9 +163,9 @@ Restart-Service hvservice
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
 ```
 
-📸: ![enable-wsl](screenshots/19.png) → WSL [Upload 19.png to screenshots/]
+ ![enable-wsl](screenshots/19.png)
 
-> Hyper-V and WSL2 fight over virtualization resources. Always shut down WSL before building a VM.
+>> # Hyper-V and WSL2 fight over virtualization resources. Always shut down WSL before building a VM.
 
 ---
 
@@ -178,10 +178,10 @@ Get-VMFirmware -VMName $VMName
 Get-VMSnapshot -VMName $VMName
 ```
 
-📸: ![get-vm](screenshots/23.png) → Verification [Upload 23.png to screenshots/]  
-📸: ![dvd-drive](screenshots/24.png) → Verification [Upload 24.png to screenshots/]  
-📸: ![firmware](screenshots/25.png) → Verification [Upload 25.png to screenshots/]  
-📸: ![snapshot-output](screenshots/26.png) → Verification [Upload snapshot-output.png to screenshots/]
+ ![get-vm](screenshots/23.png)   
+ ![dvd-drive](screenshots/24.png)   
+ ![firmware](screenshots/25.png)   
+ ![snapshot-output](screenshots/26.png)
 
 **Checklist:**
 - ✅ VM exists and is recognized  
@@ -191,7 +191,7 @@ Get-VMSnapshot -VMName $VMName
 
 ---
 
-## 8. Troubleshooting
+## 8. Troubleshooting (UNDER CONSTRUCTION - TROUBLESHOOTING THE TROUBLESHOOTER)
 
 | Issue | Symptom | Fix |
 |-------|----------|-----|
@@ -203,16 +203,16 @@ Get-VMSnapshot -VMName $VMName
 | Git Branch Swap | Default branch not main | `git branch -m master main` |
 | Boot Loop Error | VM hangs at PXE | Strip network boot, force DVD |
 
-📸: ![get-vmswitch-error](screenshots/27.png) → Troubleshooting [Upload 27.png to screenshots/]  
-📸: ![get-vm-error](screenshots/28.png) → Troubleshooting [Upload 28.png to screenshots/]  
-📸: ![get-vmdvddrive-error](screenshots/29.png) → Troubleshooting [Upload 29.png to screenshots/]  
-📸: ![firmware-before](screenshots/30.png) → Troubleshooting [Upload 30.png to screenshots/]  
-📸: ![checkpoint-rollback](screenshots/31.png) → Troubleshooting [Upload 31.png to screenshots/]  
-📸: ![networkadapter-error](screenshots/32.png) → Troubleshooting [Upload 32.png to screenshots/]  
-📸: ![wsl-shutdown-troubleshoot](screenshots/33.png) → Troubleshooting [Upload 33.png to screenshots/]  
-📸: ![firmware-error](screenshots/34.png) → Troubleshooting [Upload 34.png to screenshots/]  
-📸: ![git-branch-fix](screenshots/35.png) → Troubleshooting [Upload 35.png to screenshots/]  
-📸: ![slmgr](screenshots/36.png) → Troubleshooting [Upload 36.png to screenshots/]
+ ![get-vmswitch-error](screenshots/27.png)  
+ ![get-vm-error](screenshots/28.png)  
+ ![get-vmdvddrive-error](screenshots/29.png)  
+ ![firmware-before](screenshots/30.png)  
+ ![checkpoint-rollback](screenshots/31.png)  
+ ![networkadapter-error](screenshots/32.png)  
+ ![wsl-shutdown-troubleshoot](screenshots/33.png)  
+ ![firmware-error](screenshots/34.png)  
+ ![git-branch-fix](screenshots/35.png)  
+ ![slmgr](screenshots/36.png)
 
 ---
 
@@ -225,9 +225,19 @@ Get-VMSnapshot -VMName $VMName
 2. Run as Administrator  
 3. Follow prompts
 
-📸: ![script-editor-01](screenshots/42.png) → Advanced [Upload 42.png to screenshots/]  
-📸: ![script-editor-02](screenshots/43.png) → Advanced [Upload 43.png to screenshots/]  
-📸: ![script-editor-03](screenshots/script-editor-03.png) → Advanced [Upload script-editor-03.png to screenshots/]
+ ![script-editor-01](screenshots/21.png) 
+ ![script-editor-02](screenshots/22.png)
+ 
+
+# Script Optimization
+The functions above have been aliased in the .ps1 file. Instead of manually typing: 
+> Get-VMSwitch | Format-Table Name, SwitchType, NetAdapterInterfaceDescription -AutoSize
+>
+All we have to do now is call the function 
+>Get-MyVMSwitches
+>
+
+I have added this script to a larger - more impressive utility script that fires when the powershell terminal is first opened. The benefit here is that when I am spinning up VM's in the windows OS -I have a constant reminder of where all of my tools and utilities are.
 
 ```powershell
 # Custom Hyper-V Query Functions
@@ -273,7 +283,7 @@ Write-Host "Script path: $PSScriptRoot" -ForegroundColor Cyan
 Write-Host "Alias 'tools' ready for interactive menu. Type 'tools' to launch." -ForegroundColor Green
 # NO AUTO-TRIGGER HERE – Call manually with 'tools'
 # VM Creation Function (New-Win11VM) – Cutoff accepted at line 7 post-activation key
-
+```
 ---
 
 ## 10. Appendix: Photo Map & Notes
