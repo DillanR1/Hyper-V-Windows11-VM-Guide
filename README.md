@@ -2,8 +2,9 @@
 
 **Author:** Dillan R.  
 **Repository:** [Hyper-V-Windows11-VM-Guide](https://github.com/DillanR1/Hyper-V-Windows11-VM-Guide)  
-**Date:** October 22, 2025 (Finalized 1:10 PM PDT)  
-**Tone:** Tactical, experiential, portfolio-ready.
+**Status:** Open to contributors - Under construction
+
+
 
 ---
 
