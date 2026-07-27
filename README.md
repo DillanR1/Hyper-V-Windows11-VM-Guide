@@ -989,7 +989,7 @@ This guide is provided for educational purposes. Always verify commands before e
 **Dillan Roby**  
 **GitHub:** https://github.com/DillanR1  
 **Repository:** https://github.com/DillanR1/Hyper-V-Windows11-VM-Guide  
-**LinkedIn:** [Your LinkedIn Profile]
+**LinkedIn:** linkedin.com/in/dillan-roby/
 
 **Core Competencies:**
 - Hyper-V virtualization and advanced configuration
@@ -1016,7 +1016,7 @@ This guide is provided for educational purposes. Always verify commands before e
 
 **Want to see more projects?** Check out my other lab guides:
 - [Active Directory Lab (Windows Server 2022)](https://github.com/DillanR1/Windows-Server-Active-Directory)
-- [osTicket Deployment (Linux LAMP Stack)](https://github.com/DillanR1/osTicket-Linux-Deployment)
+- [osTicket Deployment (Linux LAMP Stack)](https://github.com/DillanR1/osTicket-lab)
 
 ---
 
