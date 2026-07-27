@@ -7,20 +7,8 @@
 
 ---
 
-## 🎯 For Recruiters: What This Project Demonstrates
-
-**"Hyper-V experience"** on most resumes means: *"I clicked 'New Virtual Machine' in the GUI once."*
-
-**This project demonstrates:**
-- Complete Windows 11 VM deployment from PowerShell automation
-- Advanced virtualization concepts: Generation 2 VMs, TPM/Secure Boot, UEFI firmware
-- Network architecture: External switches, adapter configuration, internet routing
-- Boot order management and PXE boot troubleshooting
-- WSL2 conflict resolution (common enterprise virtualization challenge)
-- Checkpoint strategy for backup and disaster recovery
-- Custom PowerShell scripting with safety mechanisms and error handling
-
-**Translation:** Beyond basic VM creation, this covers enterprise virtualization infrastructure—the foundation for test labs, development environments, and disaster recovery systems. These skills apply to VMware ESXi, Azure, AWS EC2, and any virtualized infrastructure role.
+## What This Project Demonstrates
+Complete Windows 11 Gen 2 VM deployment via PowerShell automation: TPM/Secure Boot/UEFI configuration, external switch networking with internet routing, boot-order and PXE troubleshooting, WSL2/Hyper-V conflict resolution, and checkpoint-based backup and recovery. These concepts carry directly to VMware ESXi, Azure, and AWS.
 
 ---
 
@@ -1012,9 +1000,8 @@ This guide is provided for educational purposes. Always verify commands before e
 
 **Certification Track:**
 - CompTIA A+ (Certified)
-- CompTIA Network+ (In Progress)
-- CompTIA Security+ (Planned)
-- Microsoft Certified: Azure Administrator Associate (Planned)
+- CompTIA Network+ (Certified)
+- CompTIA Security+ (In Progress)
 
 ---
 
@@ -1024,8 +1011,8 @@ This guide is provided for educational purposes. Always verify commands before e
 
 **Issues or questions?**
 - Open an issue: https://github.com/DillanR1/Hyper-V-Windows11-VM-Guide/issues
-- Email: [Your Contact Email]
-- LinkedIn: [Your LinkedIn Profile]
+- Email: dillanroby1@gmail.com
+- LinkedIn: linkedin.com/in/dillan-roby/
 
 **Want to see more projects?** Check out my other lab guides:
 - [Active Directory Lab (Windows Server 2022)](https://github.com/DillanR1/Windows-Server-Active-Directory)
@@ -1033,6 +1020,6 @@ This guide is provided for educational purposes. Always verify commands before e
 
 ---
 
-*This deployment guide was field-tested through multiple build/break/rebuild cycles to document real-world issues and their solutions. Last updated: December 2024*
+*This deployment guide was field-tested through multiple build/break/rebuild cycles to document real-world issues and their solutions. Last updated: July 2026*
 
 **Remember:** The best way to learn virtualization is to break things intentionally, then fix them. That's how this guide was created.
